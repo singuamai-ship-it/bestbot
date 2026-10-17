@@ -329,7 +329,7 @@ def support_button(kb):
     if SUPPORT_USERNAME:
         kb.add(button(
             "🆘 Support",
-            url=f"https://t.me/{xylerigcc}"
+            url=f"https://t.me/{SUPPORT_USERNAME}"
         ))
 
 def home_keyboard():
