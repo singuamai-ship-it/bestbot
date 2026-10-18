@@ -46,7 +46,6 @@ PLANS = {
     "p7": {"name": "Plan 7 - Master", "amount": 349, "demos": []},
     "p8": {"name": "Plan 8 - Ultra", "amount": 399, "demos": []},
     "p9": {"name": "Plan 9 - Pro", "amount": 449, "demos": []},
-    "p10": {"name": "Plan 10 - Ultimate", "amount": 499, "demos": []},
     "vip": {"name": "ALL VIP PLANS 👑", "amount": 999, "demos": []}
 }
 
