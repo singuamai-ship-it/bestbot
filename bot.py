@@ -1,3 +1,4 @@
+import os
 import asyncio
 import io
 import logging
@@ -20,8 +21,14 @@ import qrcode
 # ==========================================
 # CONFIGURATION & VARIABLES
 # ==========================================
-BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_HERE"
-ADMIN_ID = 123456789  # Replace with your numeric Telegram User ID
+# Railway / Environment variables se token aur admin ID safely uthayega
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8534044478:AAHeB1yHZPRPjPS4YjZm0Kaxx5cYEMHkOTI").strip()
+ADMIN_ID_RAW = os.environ.get("ADMIN_ID", "123456789").strip()
+ADMIN_ID = int(ADMIN_ID_RAW) if ADMIN_ID_RAW.isdigit() else 123456789
+
+# Safe check taaki token missing hone par clearly pata chale
+if not BOT_TOKEN or BOT_TOKEN == "YOUR_TELEGRAM_BOT_TOKEN_HERE":
+    raise ValueError("❌ BOT_TOKEN missing! Please add BOT_TOKEN in your environment or Railway variables.")
 
 # Dynamic Variables
 CURRENT_UPI = "haaland78@ybl"
