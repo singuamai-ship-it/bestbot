@@ -25,7 +25,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN_HERE").strip()
 ADMIN_ID_RAW = os.environ.get("ADMIN_ID", "123456789").strip()
 ADMIN_ID = int(ADMIN_ID_RAW) if ADMIN_ID_RAW.isdigit() else 123456789
 
-if not BOT_TOKEN or BOT_TOKEN == "Y8534044478:AAHeB1yHZPRPjPS4YjZm0Kaxx5cYEMHkOTI":
+if not BOT_TOKEN or BOT_TOKEN == "YOUR_TELEGRAM_BOT_TOKEN_HERE":
     raise ValueError("❌ BOT_TOKEN missing! Please add BOT_TOKEN in your Railway variables.")
 
 # Dynamic Variables
@@ -99,15 +99,12 @@ async def safe_delete_messages(chat_id: int, message_ids: list):
 # ==========================================
 def get_main_menu_keyboard():
     buttons = []
-    # 10 Danger Plans (Red indicator 🔴)
     for key, data in PLANS.items():
         if key != "vip":
-            buttons.append([InlineKeyboardButton(text=f"🔴 {data['name']} - ₹{data['amount']}", callback_data=f"select_plan:{key}", style="danger")])
+            buttons.append([InlineKeyboardButton(text=f"🔴 {data['name']} - ₹{data['amount']}", callback_data=f"select_plan:{key}" , style="danger")])
 
-    # VIP Plan at bottom
     buttons.append([InlineKeyboardButton(text=f"🔥 ALL VIP PLANS - ₹{PLANS['vip']['amount']} 🔥", callback_data="select_plan:vip", style="danger")])
 
-    # Bottom Row: How To Use (Blue 🔵) & Support (Green 🟢)
     buttons.append([
         InlineKeyboardButton(text="🔵 How To Use", callback_data="how_to_use", style="primary"),
         InlineKeyboardButton(text="🟢 Support 24/7", url=SUPPORT_TG_URL, style="success")
@@ -123,7 +120,6 @@ async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
     USER_IDS.add(message.from_user.id)
 
-    # 12-14 line caption as requested
     caption_text = (
         "🔥 **WELCOME TO THE ULTIMATE VIP STORE** 🔥\n\n"
         "⚡ Get instant access to premium verified courses & materials.\n"
@@ -162,7 +158,6 @@ async def handle_plan_selection(callback: types.CallbackQuery, state: FSMContext
 
     demo_msg_ids = []
 
-    # Send Demo Media Group with Spoiler Blur
     if plan_data["demos"]:
         media_group = []
         for media in plan_data["demos"]:
@@ -177,7 +172,6 @@ async def handle_plan_selection(callback: types.CallbackQuery, state: FSMContext
         info_msg = await callback.message.answer("ℹ️ *Demo media for this plan will be added soon by admin.*", parse_mode="Markdown")
         demo_msg_ids.append(info_msg.message_id)
 
-    # 5-6 line caption for demo
     demo_caption = (
         f"🌟 **{plan_data['name']} - Exclusive Preview**\n\n"
         f"✅ Full unlocked HD video lectures & downloadable study materials.\n"
@@ -187,9 +181,8 @@ async def handle_plan_selection(callback: types.CallbackQuery, state: FSMContext
         f"👇 Click **Buy Now** to generate your secure payment QR code!"
     )
 
-    # Green Buy Now (🟢), Blue Back to Plan (🔵)
     demo_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"🟢 Buy Now — ₹{plan_data['amount']}", callback_data=f"buy_now:{plan_key}", style="success")],
+        [InlineKeyboardButton(text=f"🟢 𝘽𝙐𝙔 𝙉𝙊𝙒 — ₹{plan_data['amount']}", callback_data=f"buy_now:{plan_key}", style="success")],
         [InlineKeyboardButton(text="🔵 BACK TO PLANS", callback_data="back_to_main", style="primary")]
     ])
 
@@ -205,7 +198,6 @@ async def handle_buy_now(callback: types.CallbackQuery, state: FSMContext):
     plan_key = callback.data.split(":")[1]
     data = await state.get_data()
 
-    # Delete demo messages and caption instantly
     if "demo_msg_ids" in data:
         await safe_delete_messages(callback.message.chat.id, data["demo_msg_ids"])
 
@@ -221,17 +213,17 @@ async def show_payment_qr(chat_id: int, plan_key: str, state: FSMContext):
     qr_file = BufferedInputFile(qr_buffer.getvalue(), filename="payment_qr.png")
 
     caption = (
-        f"💳 **PAYMENT DETAILS**\n\n"
-        f"📦 Plan: {plan_data['name']}\n"
-        f"💰 Amount: ₹{plan_data['amount']}\n"
-        f"🆔 Transaction ID: `{txn_id}`\n\n"
-        f"📲 Scan the QR code and pay the exact amount.\n"
-        f"After payment, tap **Verify Payment** and send your screenshot."
+        f"🔥 **Pay To Get Paid Access**\n\n"
+        f"🆔 **TXN:** `{txn_id}`\n"
+        f"💎 **UPI:** `{CURRENT_UPI}` (tap to copy)\n"
+        f"📦 **Plan:** {plan_data['name']}\n"
+        f"💰 **Amount:** ₹{plan_data['amount']}\n\n"
+        f"📲 Scan the QR or copy the UPI ID above and pay the exact amount."
     )
 
     payment_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🟢 VERIFY PAYMENT", callback_data=f"verify_payment:{plan_key}:{txn_id}", style="success")],
-        [InlineKeyboardButton(text="🔴 CANCEL PURCHASE", callback_data="back_to_main", style="danger")]
+        [InlineKeyboardButton(text="🟢 Verify Payment", callback_data=f"verify_payment:{plan_key}:{txn_id}", style="success")],
+        [InlineKeyboardButton(text="🔴 Cancel Purchase", callback_data="back_to_main", style="danger")]
     ])
 
     msg = await bot.send_photo(
@@ -258,8 +250,14 @@ async def handle_verify_payment(callback: types.CallbackQuery, state: FSMContext
     await state.set_state(BotStates.waiting_for_screenshot)
     await state.update_data(current_plan=plan_key, txn_id=txn_id)
 
+    screen_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🔵 Back", callback_data="back_to_main", style="primary")]
+    ])
+
     await callback.message.answer(
-        "📸 Please send your payment screenshot as a photo."
+        "📸 **Please send your payment screenshot now as a photo for verification:**",
+        reply_markup=screen_kb,
+        parse_mode="Markdown"
     )
     await callback.answer()
 
@@ -287,18 +285,18 @@ async def process_payment_screenshot(message: types.Message, state: FSMContext):
         chat_id=ADMIN_ID,
         photo=screenshot_id,
         caption=(
-            f"💳 **PAYMENT VERIFICATION REQUEST**\n\n"
+            f"📥 **NEW PAYMENT PROOF RECEIVED**\n\n"
             f"👤 User: {message.from_user.full_name}\n"
             f"🆔 User ID: `{message.from_user.id}`\n"
             f"📦 Plan: {plan_data['name']}\n"
             f"💰 Amount: ₹{plan_data['amount']}\n"
-            f"🧾 Transaction ID: `{txn_id}`"
+            f"🆔 TXN: `{txn_id}`"
         ),
         reply_markup=admin_kb,
         parse_mode="Markdown"
     )
 
-    await message.answer("✅ Screenshot submitted. Please wait for admin verification.")
+    await message.answer("⌛ **Screenshot received! Waiting for admin approval...**", parse_mode="Markdown")
     await state.clear()
 
 
@@ -317,14 +315,44 @@ async def handle_admin_approve(callback: types.CallbackQuery):
     try:
         await bot.send_message(
             user_id,
-            f"✅ **PAYMENT APPROVED!**\n\nYour payment for {plan_data['name']} has been approved.\nTransaction ID: `{txn_id}`",
+            f"✅ **Payment Verified! Successfully purchased {plan_data['name']}.**",
             parse_mode="Markdown"
         )
     except Exception as e:
         logging.error(f"Could not notify user {user_id}: {e}")
 
-    await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.answer("Payment approved!")
+    screenshot_id = callback.message.photo[-1].file_id if callback.message.photo else None
+
+    broadcast_caption = (
+        f"🎉 **NEW SUCCESSFUL PURCHASE** 🎉\n\n"
+        f"📦 **Plan:** {plan_data['name']}\n"
+        f"💰 **Amount:** ₹{plan_data['amount']}\n"
+        f"🟢 **STATUS - SUCCESSFULLY PURCHASED**\n\n"
+        f"👇 **Explore all plans below:**"
+    )
+
+    for uid in list(USER_IDS):
+        try:
+            if screenshot_id:
+                await bot.send_photo(
+                    chat_id=uid,
+                    photo=screenshot_id,
+                    caption=broadcast_caption,
+                    reply_markup=get_main_menu_keyboard(),
+                    parse_mode="Markdown"
+                )
+            else:
+                await bot.send_message(
+                    chat_id=uid,
+                    text=broadcast_caption,
+                    reply_markup=get_main_menu_keyboard(),
+                    parse_mode="Markdown"
+                )
+        except Exception:
+            pass
+
+    await callback.message.edit_caption(caption=(callback.message.caption or "") + "\n\n🟢 **APPROVED & BROADCASTED**")
+    await callback.answer("Payment approved & broadcasted!")
 
 
 @dp.callback_query(F.data.startswith("admin_reject:"))
@@ -335,62 +363,56 @@ async def handle_admin_reject(callback: types.CallbackQuery):
 
     parts = callback.data.split(":")
     user_id = int(parts[1])
-    plan_key = parts[2]
-    txn_id = parts[3]
-    plan_data = PLANS[plan_key]
+    txn_id = parts[2]
 
     try:
         await bot.send_message(
             user_id,
-            f"❌ **PAYMENT REJECTED**\n\nYour payment for {plan_data['name']} was rejected. Please contact support if you think this is a mistake.\nTransaction ID: `{txn_id}`",
+            "❌ **Payment Verification Failed or Rejected by Admin.** Please contact support if you paid.",
             parse_mode="Markdown"
         )
     except Exception as e:
         logging.error(f"Could not notify user {user_id}: {e}")
 
-    await callback.message.edit_reply_markup(reply_markup=None)
+    await callback.message.edit_caption(caption=(callback.message.caption or "") + "\n\n🔴 **REJECTED BY ADMIN**")
     await callback.answer("Payment rejected!")
 
 
 @dp.callback_query(F.data == "back_to_main")
 async def handle_back_to_main(callback: types.CallbackQuery, state: FSMContext):
     await state.clear()
-
-    data = await state.get_data()
-    if "last_menu_id" in data:
-        await safe_delete_message(callback.message.chat.id, data["last_menu_id"])
-
-    await callback.message.answer(
-        "👇 **Select a plan from the menu below:**",
+    await callback.message.delete()
+    
+    msg = await callback.message.answer(
+        "👇 **Select your plan from the menu below:**",
         reply_markup=get_main_menu_keyboard(),
         parse_mode="Markdown"
     )
+    await state.update_data(last_menu_id=msg.message_id)
     await callback.answer()
 
 
 @dp.callback_query(F.data == "how_to_use")
-async def handle_how_to_use(callback: types.CallbackQuery):
+async def handle_how_to_use(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    if "last_menu_id" in data:
+        await safe_delete_message(callback.message.chat.id, data["last_menu_id"])
+
     how_to_text = (
-        "📘 **HOW TO USE THE BOT**\n\n"
-        "1️⃣ Select your preferred plan.\n"
-        "2️⃣ Watch the demo videos.\n"
-        "3️⃣ Click Buy Now to generate the payment QR.\n"
-        "4️⃣ Scan the QR and pay the exact amount.\n"
-        "5️⃣ Tap Verify Payment.\n"
-        "6️⃣ Send your payment screenshot as a photo.\n"
-        "7️⃣ Wait for admin approval.\n\n"
-        "If you need help, use the Support button."
+        "📘 **HOW TO USE THIS BOT:**\n\n"
+        "\n\n\n\n\n\n\n"
     )
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔵 BACK TO PLANS", callback_data="back_to_main", style="primary")]
+        [InlineKeyboardButton(text="🔵 BACK TO PLANS", callback_data="back_to_main")]
     ])
 
-    await callback.message.answer(
-        how_to_text,
+    msg = await callback.message.answer(
+        text=how_to_text,
         reply_markup=kb,
         parse_mode="Markdown"
     )
+    await state.update_data(last_menu_id=msg.message_id)
     await callback.answer()
 
 
@@ -398,81 +420,53 @@ async def handle_how_to_use(callback: types.CallbackQuery):
 # ADMIN COMMANDS
 # ==========================================
 
-@dp.message(Command("setupi"))
+@dp.message(Command("upi"), F.from_user.id == ADMIN_ID)
 async def cmd_set_upi(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
-
     await state.set_state(BotStates.waiting_new_upi)
-    await message.answer("Send the new UPI ID:")
+    await message.answer("✍️ **Send the new UPI ID:**", parse_mode="Markdown")
 
 
-@dp.message(BotStates.waiting_new_upi)
+@dp.message(BotStates.waiting_new_upi, F.from_user.id == ADMIN_ID)
 async def process_new_upi(message: types.Message, state: FSMContext):
     global CURRENT_UPI
-
-    if message.from_user.id != ADMIN_ID:
-        return
-
     new_upi = message.text.strip()
     if "@" not in new_upi:
         await message.answer("❌ Invalid UPI ID. Please send a valid UPI ID.")
         return
 
     CURRENT_UPI = new_upi
-    await message.answer(f"✅ UPI ID updated to: `{CURRENT_UPI}`", parse_mode="Markdown")
+    await message.answer(f"✅ **UPI ID updated successfully to:** `{CURRENT_UPI}`", parse_mode="Markdown")
     await state.clear()
 
 
-@dp.message(Command("broadcast"))
+@dp.message(Command("broadcast"), F.from_user.id == ADMIN_ID)
 async def cmd_broadcast(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
-
     await state.set_state(BotStates.waiting_broadcast)
-    await message.answer("Send the message you want to broadcast to all users:")
+    await message.answer("📢 **Send the message you want to broadcast to all users:**", parse_mode="Markdown")
 
 
-@dp.message(BotStates.waiting_broadcast)
+@dp.message(BotStates.waiting_broadcast, F.from_user.id == ADMIN_ID)
 async def process_broadcast(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
-
     sent_count = 0
     failed_count = 0
 
     for user_id in list(USER_IDS):
         try:
-            if message.text:
-                await bot.send_message(user_id, message.text)
-            elif message.photo:
-                await bot.send_photo(
-                    user_id,
-                    message.photo[-1].file_id,
-                    caption=message.caption or ""
-                )
-            elif message.video:
-                await bot.send_video(
-                    user_id,
-                    message.video.file_id,
-                    caption=message.caption or ""
-                )
+            await message.copy_to(chat_id=user_id)
             sent_count += 1
         except Exception as e:
             logging.error(f"Broadcast failed for {user_id}: {e}")
             failed_count += 1
 
     await message.answer(
-        f"✅ Broadcast complete.\nSent: {sent_count}\nFailed: {failed_count}"
+        f"✅ **Broadcast complete.**\nSent: {sent_count}\nFailed: {failed_count}",
+        parse_mode="Markdown"
     )
     await state.clear()
 
 
-@dp.message(Command("setdemo"))
+@dp.message(Command("setdemo"), F.from_user.id == ADMIN_ID)
 async def cmd_set_demo(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
-
     buttons = []
     for key, data in PLANS.items():
         buttons.append([
@@ -483,33 +477,28 @@ async def cmd_set_demo(message: types.Message, state: FSMContext):
         ])
 
     await message.answer(
-        "Choose the plan to add demo media to:",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons)
+        "⚙️ **Choose the plan to add demo media to:**",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        parse_mode="Markdown"
     )
 
 
-@dp.callback_query(F.data.startswith("set_demo_plan:"))
+@dp.callback_query(F.data.startswith("set_demo_plan:"), F.from_user.id == ADMIN_ID)
 async def handle_set_demo_plan(callback: types.CallbackQuery, state: FSMContext):
-    if callback.from_user.id != ADMIN_ID:
-        await callback.answer("Not authorized.", show_alert=True)
-        return
-
     plan_key = callback.data.split(":")[1]
     await state.update_data(demo_plan_key=plan_key)
     await state.set_state(BotStates.waiting_demo_media)
 
     await callback.message.answer(
-        f"Send the photo/video you want to add to {PLANS[plan_key]['name']}.\n"
-        "You can send multiple media items one by one. Use /done when finished."
+        f"📸 **Send photo/video for plan '{PLANS[plan_key]['name']}':**\n"
+        "You can send multiple media items one by one. Use /done when finished.",
+        parse_mode="Markdown"
     )
     await callback.answer()
 
 
-@dp.message(BotStates.waiting_demo_media, F.photo | F.video)
+@dp.message(BotStates.waiting_demo_media, F.from_user.id == ADMIN_ID, F.photo | F.video)
 async def process_demo_media(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
-
     data = await state.get_data()
     plan_key = data.get("demo_plan_key")
 
@@ -526,45 +515,62 @@ async def process_demo_media(message: types.Message, state: FSMContext):
     PLANS[plan_key]["demos"].append(media)
 
     await message.answer(
-        f"✅ Demo media added to {PLANS[plan_key]['name']}.\n"
-        f"Total demos: {len(PLANS[plan_key]['demos'])}\n"
-        "Send more media or use /done."
+        f"✅ **Demo added to {PLANS[plan_key]['name']}! (Total: {len(PLANS[plan_key]['demos'])})**\n"
+        "Send more media or use /done when finished.",
+        parse_mode="Markdown"
     )
 
 
-@dp.message(Command("done"))
-async def cmd_done(message: types.Message, state: FSMContext):
-    if message.from_user.id != ADMIN_ID:
-        return
+@dp.message(Command("removedemo"), F.from_user.id == ADMIN_ID)
+async def cmd_remove_demo(message: types.Message, state: FSMContext):
+    buttons = []
+    for key, data in PLANS.items():
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"🗑 Clear {data['name']}",
+                callback_data=f"clear_demo_plan:{key}"
+            )
+        ])
 
+    await message.answer(
+        "🗑 **Choose the plan whose demos you want to remove:**",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
+        parse_mode="Markdown"
+    )
+
+
+@dp.callback_query(F.data.startswith("clear_demo_plan:"), F.from_user.id == ADMIN_ID)
+async def handle_clear_demo_plan(callback: types.CallbackQuery):
+    plan_key = callback.data.split(":")[1]
+    PLANS[plan_key]["demos"].clear()
+    await callback.message.edit_text(f"✅ **All demos for {PLANS[plan_key]['name']} have been successfully cleared!**", parse_mode="Markdown")
+    await callback.answer()
+
+
+@dp.message(Command("done"), F.from_user.id == ADMIN_ID)
+async def cmd_done(message: types.Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state == BotStates.waiting_demo_media.state:
         await state.clear()
-        await message.answer("✅ Demo media setup completed.")
+        await message.answer("✅ **Demo media setup completed successfully.**", parse_mode="Markdown")
     else:
         await message.answer("No active setup to finish.")
 
 
-@dp.message(Command("getid"))
+@dp.message(Command("getid"), F.from_user.id == ADMIN_ID)
 async def cmd_get_id(message: types.Message, state: FSMContext):
     await state.set_state(BotStates.waiting_getid_media)
-    await message.answer("Forward a message or send a photo/video to get its file ID.")
+    await message.answer("📹 **Send any Photo or Video to get its File ID:**", parse_mode="Markdown")
 
 
-@dp.message(BotStates.waiting_getid_media, F.photo | F.video)
+@dp.message(BotStates.waiting_getid_media, F.from_user.id == ADMIN_ID, F.photo | F.video)
 async def process_getid_media(message: types.Message, state: FSMContext):
     if message.photo:
         file_id = message.photo[-1].file_id
-    else:
+        await message.answer(f"🖼 **Photo File ID:**\n`{file_id}`", parse_mode="Markdown")
+    elif message.video:
         file_id = message.video.file_id
-
-    await message.answer(f"📌 File ID:\n`{file_id}`", parse_mode="Markdown")
-    await state.clear()
-
-
-@dp.message(BotStates.waiting_getid_media, F.forward_from_chat)
-async def process_getid_forward(message: types.Message, state: FSMContext):
-    await message.answer("Please send a photo or video directly to get its file ID.")
+        await message.answer(f"🎥 **Video File ID:**\n`{file_id}`", parse_mode="Markdown")
     await state.clear()
 
 
@@ -572,7 +578,7 @@ async def process_getid_forward(message: types.Message, state: FSMContext):
 # BOT STARTUP
 # ==========================================
 async def main():
-    logging.info("🚀 VIP Store Bot is starting...")
+    print("🚀 VIP Store Bot is starting successfully...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
