@@ -26,7 +26,7 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN_HERE").strip()
 ADMIN_ID_RAW = os.environ.get("ADMIN_ID", "123456789").strip()
 ADMIN_ID = int(ADMIN_ID_RAW) if ADMIN_ID_RAW.isdigit() else 123456789
 
-if not BOT_TOKEN or BOT_TOKEN == "8959940152:AAHLJQY2wBGgGL-NCmgmXjbtKez9HcATfgs":
+if not BOT_TOKEN or BOT_TOKEN == "YOUR_TELEGRAM_BOT_TOKEN_HERE":
     raise ValueError("❌ BOT_TOKEN missing! Please add BOT_TOKEN in your Railway variables.")
 
 DB_PATH = "bot_database.db"
