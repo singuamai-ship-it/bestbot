@@ -29,7 +29,7 @@ ADMIN_ID = int(ADMIN_ID_RAW) if ADMIN_ID_RAW.isdigit() else 123456789
 if not BOT_TOKEN or BOT_TOKEN == "YOUR_TELEGRAM_BOT_TOKEN_HERE":
     raise ValueError("❌ BOT_TOKEN missing! Please add BOT_TOKEN in your Railway variables.")
 
-DB_PATH = "bot_database.db"
+DB_PATH = "/app/data/bot_database.db"
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
