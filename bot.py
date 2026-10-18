@@ -4,6 +4,7 @@ import io
 import logging
 import random
 import datetime
+import sqlite3
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
@@ -19,7 +20,7 @@ from aiogram.types import (
 import qrcode
 
 # ==========================================
-# CONFIGURATION & VARIABLES
+# CONFIGURATION & DATABASE SETUP
 # ==========================================
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "YOUR_TELEGRAM_BOT_TOKEN_HERE").strip()
 ADMIN_ID_RAW = os.environ.get("ADMIN_ID", "123456789").strip()
@@ -28,30 +29,99 @@ ADMIN_ID = int(ADMIN_ID_RAW) if ADMIN_ID_RAW.isdigit() else 123456789
 if not BOT_TOKEN or BOT_TOKEN == "YOUR_TELEGRAM_BOT_TOKEN_HERE":
     raise ValueError("❌ BOT_TOKEN missing! Please add BOT_TOKEN in your Railway variables.")
 
-# Dynamic Variables
-CURRENT_UPI = "haaland78@ybl"
-SUPPORT_TG_URL = "https://t.me/xylerigcc"
+DB_PATH = "bot_database.db"
 
-# User Tracking DB (In-Memory)
-USER_IDS = set()
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)")
+    cursor.execute("CREATE TABLE IF NOT EXISTS demos (id INTEGER PRIMARY KEY AUTOINCREMENT, plan_key TEXT, media_type TEXT, file_id TEXT)")
+    conn.commit()
+    
+    cursor.execute("SELECT value FROM settings WHERE key='current_upi'")
+    if not cursor.fetchone():
+        cursor.execute("INSERT INTO settings (key, value) VALUES ('current_upi', 'haaland78@ybl')")
+        conn.commit()
+    conn.close()
+
+init_db()
+
+SUPPORT_TG_URL = "https://t.me/xylerigcc"
 
 # Plan Definitions (10 Plans + 1 VIP Plan)
 PLANS = {
-    "p1": {"name": "Plan 1 - Basic", "amount": 50, "demos": []},
-    "p2": {"name": "Plan 2 - Starter", "amount": 99, "demos": []},
-    "p3": {"name": "Plan 3 - Silver", "amount": 149, "demos": []},
-    "p4": {"name": "Plan 4 - Gold", "amount": 199, "demos": []},
-    "p5": {"name": "Plan 5 - Platinum", "amount": 249, "demos": []},
-    "p6": {"name": "Plan 6 - Diamond", "amount": 299, "demos": []},
-    "p7": {"name": "Plan 7 - Master", "amount": 349, "demos": []},
-    "p8": {"name": "Plan 8 - Ultra", "amount": 399, "demos": []},
-    "p9": {"name": "Plan 9 - Pro", "amount": 449, "demos": []},
-    "vip": {"name": "ALL VIP PLANS 👑", "amount": 999, "demos": []}
+    "p1": {"name": "Plan 1 - Basic", "amount": 50},
+    "p2": {"name": "Plan 2 - Starter", "amount": 99},
+    "p3": {"name": "Plan 3 - Silver", "amount": 149},
+    "p4": {"name": "Plan 4 - Gold", "amount": 199},
+    "p5": {"name": "Plan 5 - Platinum", "amount": 249},
+    "p6": {"name": "Plan 6 - Diamond", "amount": 299},
+    "p7": {"name": "Plan 7 - Master", "amount": 349},
+    "p8": {"name": "Plan 8 - Ultra", "amount": 399},
+    "p9": {"name": "Plan 9 - Pro", "amount": 449},
+    "p10": {"name": "Plan 10 - Ultimate", "amount": 499},
+    "vip": {"name": "ALL VIP PLANS 👑", "amount": 999}
 }
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
+
+# ==========================================
+# DATABASE HELPER FUNCTIONS
+# ==========================================
+def get_current_upi():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM settings WHERE key='current_upi'")
+    res = cursor.fetchone()
+    conn.close()
+    return res[0] if res else "haaland78@ybl"
+
+def set_current_upi(new_upi):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("UPDATE settings SET value=? WHERE key='current_upi'", (new_upi,))
+    conn.commit()
+    conn.close()
+
+def add_user_db(user_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (user_id,))
+    conn.commit()
+    conn.close()
+
+def get_all_users():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM users")
+    users = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return users
+
+def get_plan_demos(plan_key):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT media_type, file_id FROM demos WHERE plan_key=?", (plan_key,))
+    demos = [{"type": row[0], "file_id": row[1]} for row in cursor.fetchall()]
+    conn.close()
+    return demos
+
+def add_demo_db(plan_key, media_type, file_id):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO demos (plan_key, media_type, file_id) VALUES (?, ?, ?)", (plan_key, media_type, file_id))
+    conn.commit()
+    conn.close()
+
+def clear_plan_demos(plan_key):
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM demos WHERE plan_key=?", (plan_key,))
+    conn.commit()
+    conn.close()
 
 # ==========================================
 # STATES (FSM)
@@ -100,13 +170,13 @@ def get_main_menu_keyboard():
     buttons = []
     for key, data in PLANS.items():
         if key != "vip":
-            buttons.append([InlineKeyboardButton(text=f"🔴 {data['name']} - ₹{data['amount']}", callback_data=f"select_plan:{key}" , style="danger")])
+            buttons.append([InlineKeyboardButton(text=f"🔴 {data['name']} - ₹{data['amount']}", callback_data=f"select_plan:{key}")])
 
-    buttons.append([InlineKeyboardButton(text=f"🔥 ALL VIP PLANS - ₹{PLANS['vip']['amount']} 🔥", callback_data="select_plan:vip", style="danger")])
+    buttons.append([InlineKeyboardButton(text=f"🔥 ALL VIP PLANS - ₹{PLANS['vip']['amount']} 🔥", callback_data="select_plan:vip")])
 
     buttons.append([
-        InlineKeyboardButton(text="🔵 How To Use", callback_data="how_to_use", style="primary"),
-        InlineKeyboardButton(text="🟢 Support 24/7", url=SUPPORT_TG_URL, style="success")
+        InlineKeyboardButton(text="🔵 How To Use", callback_data="how_to_use"),
+        InlineKeyboardButton(text="🟢 Support 24/7", url=SUPPORT_TG_URL)
     ])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
@@ -117,7 +187,7 @@ def get_main_menu_keyboard():
 @dp.message(CommandStart())
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
-    USER_IDS.add(message.from_user.id)
+    add_user_db(message.from_user.id)
 
     caption_text = (
         "🔥 **WELCOME TO THE ULTIMATE VIP STORE** 🔥\n\n"
@@ -156,10 +226,11 @@ async def handle_plan_selection(callback: types.CallbackQuery, state: FSMContext
         return
 
     demo_msg_ids = []
+    demos = get_plan_demos(plan_key)
 
-    if plan_data["demos"]:
+    if demos:
         media_group = []
-        for media in plan_data["demos"]:
+        for media in demos:
             if media["type"] == "photo":
                 media_group.append(InputMediaPhoto(media=media["file_id"], has_spoiler=True))
             elif media["type"] == "video":
@@ -181,8 +252,8 @@ async def handle_plan_selection(callback: types.CallbackQuery, state: FSMContext
     )
 
     demo_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=f"🟢 𝘽𝙐𝙔 𝙉𝙊𝙒 — ₹{plan_data['amount']}", callback_data=f"buy_now:{plan_key}", style="success")],
-        [InlineKeyboardButton(text="🔵 BACK TO PLANS", callback_data="back_to_main", style="primary")]
+        [InlineKeyboardButton(text=f"🟢 𝘽𝙐𝙔 𝙉𝙊𝙒 — ₹{plan_data['amount']}", callback_data=f"buy_now:{plan_key}")],
+        [InlineKeyboardButton(text="🔵 BACK TO PLANS", callback_data="back_to_main")]
     ])
 
     caption_msg = await callback.message.answer(text=demo_caption, reply_markup=demo_kb, parse_mode="Markdown")
@@ -207,22 +278,23 @@ async def handle_buy_now(callback: types.CallbackQuery, state: FSMContext):
 async def show_payment_qr(chat_id: int, plan_key: str, state: FSMContext):
     plan_data = PLANS[plan_key]
     txn_id = generate_txn_id(plan_key)
+    current_upi = get_current_upi()
 
-    qr_buffer = generate_upi_qr(CURRENT_UPI, plan_data["amount"])
+    qr_buffer = generate_upi_qr(current_upi, plan_data["amount"])
     qr_file = BufferedInputFile(qr_buffer.getvalue(), filename="payment_qr.png")
 
     caption = (
         f"🔥 **Pay To Get Paid Access**\n\n"
         f"🆔 **TXN:** `{txn_id}`\n"
-        f"💎 **UPI:** `{CURRENT_UPI}` (tap to copy)\n"
+        f"💎 **UPI:** `{current_upi}` (tap to copy)\n"
         f"📦 **Plan:** {plan_data['name']}\n"
         f"💰 **Amount:** ₹{plan_data['amount']}\n\n"
         f"📲 Scan the QR or copy the UPI ID above and pay the exact amount."
     )
 
     payment_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🟢 Verify Payment", callback_data=f"verify_payment:{plan_key}:{txn_id}", style="success")],
-        [InlineKeyboardButton(text="🔴 Cancel Purchase", callback_data="back_to_main", style="danger")]
+        [InlineKeyboardButton(text="🟢 Verify Payment", callback_data=f"verify_payment:{plan_key}:{txn_id}")],
+        [InlineKeyboardButton(text="🔴 Cancel Purchase", callback_data="back_to_main")]
     ])
 
     msg = await bot.send_photo(
@@ -250,7 +322,7 @@ async def handle_verify_payment(callback: types.CallbackQuery, state: FSMContext
     await state.update_data(current_plan=plan_key, txn_id=txn_id)
 
     screen_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🔵 Back", callback_data="back_to_main", style="primary")]
+        [InlineKeyboardButton(text="🔵 Back", callback_data="back_to_main")]
     ])
 
     await callback.message.answer(
@@ -276,8 +348,8 @@ async def process_payment_screenshot(message: types.Message, state: FSMContext):
     screenshot_id = message.photo[-1].file_id
 
     admin_kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🟢 APPROVE PAYMENT", callback_data=f"admin_approve:{message.from_user.id}:{plan_key}:{txn_id}", style="success")],
-        [InlineKeyboardButton(text="🔴 REJECT PAYMENT", callback_data=f"admin_reject:{message.from_user.id}:{plan_key}:{txn_id}", style="danger")]
+        [InlineKeyboardButton(text="🟢 APPROVE PAYMENT", callback_data=f"admin_approve:{message.from_user.id}:{plan_key}:{txn_id}")],
+        [InlineKeyboardButton(text="🔴 REJECT PAYMENT", callback_data=f"admin_reject:{message.from_user.id}:{txn_id}")]
     ])
 
     await bot.send_photo(
@@ -330,7 +402,8 @@ async def handle_admin_approve(callback: types.CallbackQuery):
         f"👇 **Explore all plans below:**"
     )
 
-    for uid in list(USER_IDS):
+    all_users = get_all_users()
+    for uid in all_users:
         try:
             if screenshot_id:
                 await bot.send_photo(
@@ -362,7 +435,6 @@ async def handle_admin_reject(callback: types.CallbackQuery):
 
     parts = callback.data.split(":")
     user_id = int(parts[1])
-    txn_id = parts[2]
 
     try:
         await bot.send_message(
@@ -427,14 +499,13 @@ async def cmd_set_upi(message: types.Message, state: FSMContext):
 
 @dp.message(BotStates.waiting_new_upi, F.from_user.id == ADMIN_ID)
 async def process_new_upi(message: types.Message, state: FSMContext):
-    global CURRENT_UPI
     new_upi = message.text.strip()
     if "@" not in new_upi:
         await message.answer("❌ Invalid UPI ID. Please send a valid UPI ID.")
         return
 
-    CURRENT_UPI = new_upi
-    await message.answer(f"✅ **UPI ID updated successfully to:** `{CURRENT_UPI}`", parse_mode="Markdown")
+    set_current_upi(new_upi)
+    await message.answer(f"✅ **UPI ID updated successfully to:** `{new_upi}`", parse_mode="Markdown")
     await state.clear()
 
 
@@ -448,8 +519,9 @@ async def cmd_broadcast(message: types.Message, state: FSMContext):
 async def process_broadcast(message: types.Message, state: FSMContext):
     sent_count = 0
     failed_count = 0
+    all_users = get_all_users()
 
-    for user_id in list(USER_IDS):
+    for user_id in all_users:
         try:
             await message.copy_to(chat_id=user_id)
             sent_count += 1
@@ -507,14 +579,15 @@ async def process_demo_media(message: types.Message, state: FSMContext):
         return
 
     if message.photo:
-        media = {"type": "photo", "file_id": message.photo[-1].file_id}
+        file_id = message.photo[-1].file_id
+        add_demo_db(plan_key, "photo", file_id)
     else:
-        media = {"type": "video", "file_id": message.video.file_id}
+        file_id = message.video.file_id
+        add_demo_db(plan_key, "video", file_id)
 
-    PLANS[plan_key]["demos"].append(media)
-
+    total_demos = len(get_plan_demos(plan_key))
     await message.answer(
-        f"✅ **Demo added to {PLANS[plan_key]['name']}! (Total: {len(PLANS[plan_key]['demos'])})**\n"
+        f"✅ **Demo added to {PLANS[plan_key]['name']}! (Total: {total_demos})**\n"
         "Send more media or use /done when finished.",
         parse_mode="Markdown"
     )
@@ -541,7 +614,7 @@ async def cmd_remove_demo(message: types.Message, state: FSMContext):
 @dp.callback_query(F.data.startswith("clear_demo_plan:"), F.from_user.id == ADMIN_ID)
 async def handle_clear_demo_plan(callback: types.CallbackQuery):
     plan_key = callback.data.split(":")[1]
-    PLANS[plan_key]["demos"].clear()
+    clear_plan_demos(plan_key)
     await callback.message.edit_text(f"✅ **All demos for {PLANS[plan_key]['name']} have been successfully cleared!**", parse_mode="Markdown")
     await callback.answer()
 
